@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Classifier</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #74b9ff, #81ecec);
+        }
+        .container {
+            background-color: #fff;
+            padding: 40px 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+            transition: transform 0.3s ease-in-out;
+        }
+        .container:hover {
+            transform: translateY(-10px);
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        #input-image {
+            max-width: 100%;
+            height: auto;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        input[type="file"] {
+            margin: 20px 0;
+            font-size: 1rem;
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 18px;
+            background-color: #0984e3;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        button:hover:enabled {
+            background-color: #74b9ff;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+        p#result {
+            margin-top: 30px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #2d3436;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Image Classifier</h1>
+        <input type="file" id="upload-image" accept="image/*" />
+        <img id="input-image" />
+        <p id="result"></p>
+        <button id="predict-button" disabled>ทำนายผล</button>
+    </div>
+
+    <script>
+        let model;
+        let labels = [];
+
+        // โหลดไฟล์ labels
+        async function loadLabels() {
+            const response = await fetch('https://storage.googleapis.com/download.tensorflow.org/data/imagenet_class_index.json');
+            const data = await response.json();
+            labels = Object.values(data).map(item => item[1]);
+        }
+
+        // โหลดโมเดล MobileNet จาก tfhub
+        async function loadModel() {
+            model = await tf.loadGraphModel('https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v2_100_224/classification/3/default/1', {fromTFHub: true});
+            console.log('✅ โมเดลถูกโหลดเรียบร้อย');
+            document.getElementById('predict-button').disabled = false;
+        }
+
+        let imageReady = false;
+        document.getElementById('upload-image').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function() {
+                const img = document.getElementById('input-image');
+                img.src = reader.result;
+
+                img.onload = function() {
+                    imageReady = true;
+                };
+            };
+            reader.readAsDataURL(file);
+        });
+
+        document.getElementById('predict-button').addEventListener('click', async function() {
+            if (!imageReady) {
+                alert('กรุณาอัพโหลดรูปภาพก่อน');
+                return;
+            }
+
+            const img = document.getElementById('input-image');
+            const tensor = tf.browser.fromPixels(img)
+                              .resizeNearestNeighbor([224, 224])
+                              .toFloat()
+                              .expandDims();
+
+            const prediction = await model.predict(tensor);
+            const result = await prediction.data();
+
+            const topPrediction = result.indexOf(Math.max(...result));
+            const label = labels[topPrediction] || `Label ID: ${topPrediction}`;
+            document.getElementById('result').innerText = `ผลการทำนาย: ${label}`;
+        });
+
+        // เรียกใช้ฟังก์ชันโหลดโมเดลและ labels
+        loadModel();
+        loadLabels();
+    </script>
+</body>
+</html>
